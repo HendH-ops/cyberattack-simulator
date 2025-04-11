@@ -1,0 +1,5 @@
+BASE_DIR: C:\Users\hendr\AppData\Local\Temp\_MEI196402
+Flask EXE: C:\Users\hendr\AppData\Local\Temp\_MEI196402\backend\venv\Scripts\python.exe
+Flask App: C:\Users\hendr\AppData\Local\Temp\_MEI196402\backend\app.py
+Backend path: C:\Users\hendr\AppData\Local\Temp\_MEI196402\backend
+Frontend path: C:\Users\hendr\AppData\Local\Temp\_MEI196402\frontend

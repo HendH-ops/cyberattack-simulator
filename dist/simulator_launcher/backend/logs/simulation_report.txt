@@ -1,0 +1,9 @@
+[2025-04-06 20:21:06] Attack Detected: DDOS → DDoS Attack: Traffic flooding the server.
+[2025-04-06 20:21:10] Attack Detected: SQLI → SQL Injection Attack: Attempting to bypass login.
+[2025-04-06 20:21:13] Attack Detected: MITM → MITM Attack: Intercepting traffic between user and server.
+[2025-04-06 20:26:41] Attack Detected: DDOS → DDoS Attack: Traffic flooding the server.
+[2025-04-06 20:26:44] Attack Detected: SQLI → SQL Injection Attack: Attempting to bypass login.
+[2025-04-06 20:26:47] Attack Detected: MITM → MITM Attack: Intercepting traffic between user and server.
+[2025-04-06 20:37:26] Attack Detected: SQLI → SQL Injection Attack: Attempting to bypass login.
+[2025-04-06 20:37:33] Attack Detected: DDOS → DDoS Attack: Traffic flooding the server.
+[2025-04-06 20:37:38] Attack Detected: MITM → MITM Attack: Intercepting traffic between user and server.

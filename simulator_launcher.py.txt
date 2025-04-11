@@ -1,0 +1,115 @@
+import tkinter as tk
+import subprocess
+import os
+import webbrowser
+import psutil
+import sys
+import shutil
+
+
+# Paths
+import os
+# Determine correct base directory whether running from .exe or not
+if getattr(sys, 'frozen', False):
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+START_SCRIPT = os.path.join(BASE_DIR, "start-simulator.bat")
+STOP_SCRIPT = os.path.join(BASE_DIR, "stop-simulator.bat")
+LOG_FILE = os.path.join(BASE_DIR, "backend", "logs", "simulation_report.txt")
+
+# --- Functions ---
+import subprocess
+import os
+import sys
+
+from tkinter import messagebox
+
+def start_simulator():
+    try:
+        if not os.path.exists(START_SCRIPT):
+            messagebox.showerror("Error", f"Cannot find {START_SCRIPT}")
+            return
+        process = subprocess.Popen(START_SCRIPT, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=BASE_DIR)
+        status_label.config(text="Starting simulator...\nPlease wait...")
+        window.after(2000, check_status)  # Check status after 2 seconds
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to start simulator: {str(e)}")
+
+def stop_simulator():
+    try:
+        if not os.path.exists(STOP_SCRIPT):
+            messagebox.showerror("Error", f"Cannot find {STOP_SCRIPT}")
+            return
+        process = subprocess.Popen(STOP_SCRIPT, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=BASE_DIR)
+        status_label.config(text="Stopping simulator...\nPlease wait...")
+        window.after(2000, check_status)  # Check status after 2 seconds
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to stop simulator: {str(e)}")
+
+def check_status():
+    try:
+        # Check for Flask backend (python running app.py)
+        flask_running = False
+        react_running = False
+        
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            try:
+                if proc.info['name'] == 'python.exe' and proc.info['cmdline']:
+                    cmdline = ' '.join(proc.info['cmdline']).lower()
+                    if 'app.py' in cmdline:
+                        flask_running = True
+                elif proc.info['name'] == 'node.exe' and proc.info['cmdline']:
+                    cmdline = ' '.join(proc.info['cmdline']).lower()
+                    if 'react-scripts' in cmdline or 'npm start' in cmdline:
+                        react_running = True
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+        
+        status = ""
+        status += "🟢 Flask (backend): RUNNING\n" if flask_running else "🔴 Flask (backend): OFF\n"
+        status += "🟢 React (frontend): RUNNING\n" if react_running else "🔴 React (frontend): OFF\n"
+        
+        status_label.config(text=status)
+    except Exception as e:
+        status_label.config(text=f"Error checking status: {str(e)}")
+
+def open_report():
+    try:
+        if os.path.exists(LOG_FILE):
+            os.startfile(LOG_FILE)
+        else:
+            messagebox.showwarning("Warning", "Log file not found at:\n" + LOG_FILE)
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to open report: {str(e)}")
+
+def open_browser():
+    try:
+        webbrowser.open("http://localhost:3000")
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to open browser: {str(e)}")
+
+# --- GUI Setup ---
+window = tk.Tk()
+window.title("Cyberattack Simulator Control Panel")
+window.geometry("400x320")
+window.resizable(False, False)
+
+# Add some padding and configure grid
+window.configure(padx=20, pady=20)
+
+tk.Label(window, text="💻 Cyberattack Simulator", font=("Arial", 16, "bold")).pack(pady=10)
+
+tk.Button(window, text="▶️ Start Simulator", command=start_simulator, width=25).pack(pady=5)
+tk.Button(window, text="🛑 Stop Simulator", command=stop_simulator, width=25).pack(pady=5)
+tk.Button(window, text="🔍 Check Status", command=check_status, width=25).pack(pady=5)
+tk.Button(window, text="📄 Open Report", command=open_report, width=25).pack(pady=5)
+tk.Button(window, text="🌐 Open Simulator in Browser", command=open_browser, width=25).pack(pady=5)
+
+status_label = tk.Label(window, text="Click 'Check Status' to see simulator state", fg="green", justify="left")
+status_label.pack(pady=10)
+
+# Initial status check
+window.after(1000, check_status)
+
+window.mainloop()
