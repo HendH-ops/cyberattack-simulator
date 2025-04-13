@@ -1,5 +1,7 @@
 # Cyber Attack Simulator
 
+- Author: Hendrik Hollo
+
 A web-based cyber attack simulation tool with AI-powered analysis. This project consists of a React frontend and Flask backend.
 
 ## Features
