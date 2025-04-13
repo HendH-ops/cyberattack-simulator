@@ -407,170 +407,542 @@ def scan_files(target_url):
             }]
         }
 
-def basic_scan(target_url):
-    """Perform basic website scan"""
+def scan_website(url, depth="basic"):
+    """Scan website for technologies and vulnerabilities"""
     try:
-        # Validate URL
-        if not target_url.startswith(('http://', 'https://')):
-            target_url = 'https://' + target_url
-        
-        # Make request
-        start_time = time.time()
-        response = requests.get(target_url, timeout=10)
-        response_time = time.time() - start_time
-        
-        if response.status_code != 200:
-            raise Exception(f"HTTP {response.status_code}")
-        
-        # Parse HTML
-        soup = BeautifulSoup(response.text, 'lxml')
-        html_content = response.text.lower()
-        
-        # Basic technology detection
-        results = detect_technologies(html_content, response.headers, response.cookies, response)
-        
-        # Basic scanning details
-        results["Scanning Details"] = {
-            "Response Time": f"{response_time:.2f} seconds",
-            "Status Code": response.status_code,
-            "Content Type": response.headers.get('Content-Type', 'Unknown'),
-            "Server": response.headers.get('Server', 'Unknown'),
-            "SSL/TLS": "Yes" if target_url.startswith('https://') else "No"
-        }
-        
-        return results
-        
-    except requests.exceptions.RequestException as e:
-        raise Exception(f"{texts['connection_error']}: {str(e)}")
-    except Exception as e:
-        raise Exception(f"{texts['error_scanning']}: {str(e)}")
-
-def advanced_scan(target_url):
-    """Perform advanced website scan"""
-    try:
-        # Validate URL
-        if not target_url.startswith(('http://', 'https://')):
-            target_url = 'https://' + target_url
-        
-        # Extract hostname for SSL analysis
-        hostname = urlparse(target_url).netloc
-        
-        # Make request
-        start_time = time.time()
-        response = requests.get(target_url, timeout=10)
-        response_time = time.time() - start_time
-        
-        if response.status_code != 200:
-            raise Exception(f"HTTP {response.status_code}")
-        
-        # Parse HTML
-        soup = BeautifulSoup(response.text, 'lxml')
-        html_content = response.text.lower()
-        
-        # Advanced technology detection
-        results = detect_technologies(html_content, response.headers, response.cookies, response)
-        
-        # Analyze SSL certificate
-        ssl_info = analyze_ssl_certificate(hostname)
-        
-        # Scan for files
-        file_scan_results = scan_files(target_url)
-        
-        # Advanced scanning details
-        results["Scanning Details"] = {
-            "Response Time": f"{response_time:.2f} seconds",
-            "Status Code": response.status_code,
-            "Content Type": response.headers.get('Content-Type', 'Unknown'),
-            "Server": response.headers.get('Server', 'Unknown'),
-            "Content Length": f"{len(response.text):,} bytes",
-            "SSL/TLS": "Yes" if target_url.startswith('https://') else "No",
-            "Redirects": len(response.history) if response.history else 0
-        }
-        
-        # Add SSL details
-        if "Error" not in ssl_info:
-            results["SSL Details"] = {
-                "Issuer": ssl_info["Issuer"],
-                "Valid From": ssl_info["Valid From"],
-                "Valid Until": ssl_info["Valid Until"],
-                "Days Until Expiry": ssl_info["Days Until Expiry"],
-                "Protocol": ssl_info["Protocol"],
-                "Cipher": ssl_info["Cipher"]
+        # Validate and clean URL
+        if not url:
+            return {
+                "error": "Invalid URL",
+                "message": "URL cannot be empty",
+                "vulnerabilities": []
             }
+            
+        # Remove any whitespace
+        url = url.strip()
         
-        # Add SSL vulnerabilities to main vulnerabilities
+        # Add https:// if not present
+        if not url.startswith(('http://', 'https://')):
+            url = 'https://' + url
+            
+        # Parse URL to validate
+        try:
+            parsed_url = urlparse(url)
+            if not parsed_url.netloc:
+                return {
+                    "error": "Invalid URL",
+                    "message": "Please enter a valid website address",
+                    "vulnerabilities": []
+                }
+        except Exception as e:
+            return {
+                "error": "Invalid URL",
+                "message": f"URL parsing error: {str(e)}",
+                "vulnerabilities": []
+            }
+            
+        # Initialize results
+        results = {
+            "technologies": [],
+            "vulnerabilities": [],
+            "server_info": {},
+            "ssl_info": {},
+            "headers": {}
+        }
+        
+        # Make request with custom headers and longer timeout
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+        }
+        
+        try:
+            response = requests.get(url, headers=headers, timeout=30, verify=True)
+            response.raise_for_status()  # Raise an exception for bad status codes
+        except requests.exceptions.SSLError as e:
+            return {
+                "error": "SSL Error",
+                "message": f"SSL verification failed: {str(e)}",
+                "vulnerabilities": [{
+                    "type": "SSL/TLS Error",
+                    "severity": "High",
+                    "description": "SSL/TLS connection failed",
+                    "recommendation": "Check SSL/TLS configuration and certificate"
+                }]
+            }
+        except requests.exceptions.ConnectionError as e:
+            return {
+                "error": "Connection Error",
+                "message": f"Could not connect to {url}. Please check if the website is accessible.",
+                "vulnerabilities": [{
+                    "type": "Connection Error",
+                    "severity": "High",
+                    "description": "Failed to establish connection",
+                    "recommendation": "Verify the website address and ensure it's accessible"
+                }]
+            }
+        except requests.exceptions.Timeout as e:
+            return {
+                "error": "Timeout Error",
+                "message": "The request timed out. The website might be slow or unresponsive.",
+                "vulnerabilities": [{
+                    "type": "Performance Issue",
+                    "severity": "Medium",
+                    "description": "Website response time exceeded 30 seconds",
+                    "recommendation": "Check website performance and server response time"
+                }]
+            }
+        except requests.exceptions.RequestException as e:
+            return {
+                "error": "Request Error",
+                "message": f"Error making request: {str(e)}",
+                "vulnerabilities": [{
+                    "type": "Connection Error",
+                    "severity": "High",
+                    "description": f"Request failed: {str(e)}",
+                    "recommendation": "Check the website address and try again"
+                }]
+            }
+
+        # Continue with the rest of the scanning logic...
+        soup = BeautifulSoup(response.text, 'lxml')
+        html_content = response.text.lower()
+        
+        # Initialize technologies list
+        technologies = []
+        
+        # Database Detection
+        database_patterns = {
+            'mysql': {
+                'patterns': ['mysql', 'mysqli', 'pdo_mysql'],
+                'name': 'MySQL',
+                'category': 'Databases'
+            },
+            'postgresql': {
+                'patterns': ['postgresql', 'pgsql', 'postgres'],
+                'name': 'PostgreSQL',
+                'category': 'Databases'
+            },
+            'mongodb': {
+                'patterns': ['mongodb', 'mongo'],
+                'name': 'MongoDB',
+                'category': 'Databases'
+            },
+            'redis': {
+                'patterns': ['redis'],
+                'name': 'Redis',
+                'category': 'Databases'
+            },
+            'oracle': {
+                'patterns': ['oracle', 'oci8'],
+                'name': 'Oracle',
+                'category': 'Databases'
+            }
+        }
+        
+        for db, info in database_patterns.items():
+            if any(pattern in html_content for pattern in info['patterns']):
+                technologies.append({
+                    "name": info['name'],
+                    "category": info['category'],
+                    "version": "Unknown",
+                    "period": f"{datetime.now().year}-{datetime.now().year + 1}",
+                    "confidence": 75
+                })
+        
+        # Cloud Services Detection
+        cloud_patterns = {
+            'aws': {
+                'patterns': ['amazonaws.com', 'aws-', 'cloudfront.net', 's3.amazonaws'],
+                'name': 'Amazon Web Services',
+                'category': 'Cloud Services'
+            },
+            'azure': {
+                'patterns': ['azure.com', 'windowsazure.com', 'msft.net'],
+                'name': 'Microsoft Azure',
+                'category': 'Cloud Services'
+            },
+            'gcp': {
+                'patterns': ['googleusercontent.com', 'appspot.com', 'googleapis.com'],
+                'name': 'Google Cloud Platform',
+                'category': 'Cloud Services'
+            },
+            'cloudflare': {
+                'patterns': ['cloudflare.com', 'cloudflare-'],
+                'name': 'Cloudflare',
+                'category': 'Cloud Services'
+            },
+            'digitalocean': {
+                'patterns': ['digitalocean.com', 'digitaloceanspaces.com'],
+                'name': 'DigitalOcean',
+                'category': 'Cloud Services'
+            }
+        }
+        
+        for cloud, info in cloud_patterns.items():
+            if any(pattern in html_content or pattern in str(response.headers) for pattern in info['patterns']):
+                technologies.append({
+                    "name": info['name'],
+                    "category": info['category'],
+                    "version": "N/A",
+                    "period": f"{datetime.now().year}-{datetime.now().year + 1}",
+                    "confidence": 85
+                })
+        
+        # Framework Detection with Version
+        framework_patterns = {
+            'laravel': {
+                'patterns': ['laravel', 'csrf-token'],
+                'version_pattern': r'Laravel[\/\s]?([\d\.]+)',
+                'name': 'Laravel',
+                'category': 'Frameworks'
+            },
+            'django': {
+                'patterns': ['django', 'csrfmiddlewaretoken'],
+                'version_pattern': r'Django[\/\s]?([\d\.]+)',
+                'name': 'Django',
+                'category': 'Frameworks'
+            },
+            'react': {
+                'patterns': ['react.development.js', 'react.production.min.js'],
+                'version_pattern': r'React[\/\s]?([\d\.]+)',
+                'name': 'React',
+                'category': 'Frameworks'
+            },
+            'vue': {
+                'patterns': ['vue.js', 'vue.min.js'],
+                'version_pattern': r'Vue[\/\s]?([\d\.]+)',
+                'name': 'Vue.js',
+                'category': 'Frameworks'
+            },
+            'angular': {
+                'patterns': ['angular.js', 'angular.min.js', 'ng-app'],
+                'version_pattern': r'Angular[\/\s]?([\d\.]+)',
+                'name': 'Angular',
+                'category': 'Frameworks'
+            },
+            'spring': {
+                'patterns': ['spring.js', 'spring-boot'],
+                'version_pattern': r'Spring[\/\s]?([\d\.]+)',
+                'name': 'Spring',
+                'category': 'Frameworks'
+            }
+        }
+        
+        for framework, info in framework_patterns.items():
+            if any(pattern in html_content for pattern in info['patterns']):
+                # Try to find version
+                version = "Unknown"
+                version_match = re.search(info['version_pattern'], html_content)
+                if version_match:
+                    version = version_match.group(1)
+                
+                technologies.append({
+                    "name": info['name'],
+                    "category": info['category'],
+                    "version": version,
+                    "period": f"{datetime.now().year}-{datetime.now().year + 1}",
+                    "confidence": 90
+                })
+        
+        # JavaScript Library Detection (enhanced)
+        js_patterns = {
+            'jquery': {
+                'patterns': ['jquery'],
+                'version_pattern': r'jQuery[\/\s]?([\d\.]+)',
+                'name': 'jQuery',
+                'category': 'JavaScript Libraries'
+            },
+            'bootstrap': {
+                'patterns': ['bootstrap'],
+                'version_pattern': r'Bootstrap[\/\s]?([\d\.]+)',
+                'name': 'Bootstrap',
+                'category': 'JavaScript Libraries'
+            },
+            'moment': {
+                'patterns': ['moment.js'],
+                'version_pattern': r'Moment[\/\s]?([\d\.]+)',
+                'name': 'Moment.js',
+                'category': 'JavaScript Libraries'
+            }
+        }
+        
+        scripts = soup.find_all('script')
+        for script in scripts:
+            src = script.get('src', '')
+            for js, info in js_patterns.items():
+                if any(pattern in src.lower() or pattern in str(script).lower() for pattern in info['patterns']):
+                    # Try to find version
+                    version = "Unknown"
+                    version_match = re.search(info['version_pattern'], str(script))
+                    if version_match:
+                        version = version_match.group(1)
+                    
+                    technologies.append({
+                        "name": info['name'],
+                        "category": info['category'],
+                        "version": version,
+                        "period": f"{datetime.now().year}-{datetime.now().year + 1}",
+                        "confidence": 90
+                    })
+        
+        # Add all detected technologies to results
+        results["technologies"].extend(technologies)
+        
+        # Check for HTTP vs HTTPS
+        if not url.startswith('https://'):
+            results["vulnerabilities"].append({
+                "type": "Insecure Protocol",
+                "severity": "High",
+                "description": "Website is using HTTP instead of HTTPS",
+                "recommendation": "Enable HTTPS and redirect all HTTP traffic to HTTPS"
+            })
+        
+        # Check for security headers
+        security_headers = {
+            'X-Frame-Options': 'Missing clickjacking protection',
+            'X-XSS-Protection': 'Missing XSS protection',
+            'X-Content-Type-Options': 'Missing MIME-type protection',
+            'Strict-Transport-Security': 'Missing HSTS protection',
+            'Content-Security-Policy': 'Missing CSP protection'
+        }
+        
+        for header, description in security_headers.items():
+            if header not in response.headers:
+                results["vulnerabilities"].append({
+                    "type": f"Missing {header}",
+                    "severity": "Medium",
+                    "description": description,
+                    "recommendation": f"Add {header} header to improve security"
+                })
+        
+        # Check for server information disclosure
+        if 'Server' in response.headers:
+            server = response.headers['Server']
+            if any(tech in server.lower() for tech in ['apache', 'nginx', 'iis']):
+                results["vulnerabilities"].append({
+                    "type": "Information Disclosure",
+                    "severity": "Low",
+                    "description": f"Server header reveals technology: {server}",
+                    "recommendation": "Configure server to hide version information"
+                })
+        
+        # Check for cookies without secure flag
+        for cookie in response.cookies:
+            if not cookie.secure:
+                results["vulnerabilities"].append({
+                    "type": "Insecure Cookie",
+                    "severity": "Medium",
+                    "description": f"Cookie '{cookie.name}' is set without Secure flag",
+                    "recommendation": "Set Secure flag for all cookies"
+                })
+        
+        # Get SSL info and vulnerabilities
+        ssl_info = analyze_ssl_certificate(url.split('://')[1].split('/')[0])
         if "Vulnerabilities" in ssl_info:
-            if "Vulnerabilities" not in results:
-                results["Vulnerabilities"] = []
-            results["Vulnerabilities"].extend(ssl_info["Vulnerabilities"])
+            results["vulnerabilities"].extend(ssl_info["Vulnerabilities"])
+        results["ssl_info"] = ssl_info
         
-        # Add file scan results to main results
-        if "Found Files" in file_scan_results:
-            results["Files"] = file_scan_results["Found Files"]
-        if "Security Issues" in file_scan_results:
-            if "Vulnerabilities" not in results:
-                results["Vulnerabilities"] = []
-            results["Vulnerabilities"].extend(file_scan_results["Security Issues"])
+        # Store all findings
+        results["vulnerabilities"] = results["vulnerabilities"]
+        results["server_info"] = {
+            "server": response.headers.get('Server', 'Unknown'),
+            "x-powered-by": response.headers.get('X-Powered-By', 'Unknown'),
+            "content-type": response.headers.get('Content-Type', 'Unknown')
+        }
+        results["headers"] = dict(response.headers)
         
         return results
         
-    except requests.exceptions.RequestException as e:
-        raise Exception(f"{texts['connection_error']}: {str(e)}")
+    except requests.exceptions.SSLError:
+        return {
+            "error": "SSL Error",
+            "message": "Could not establish secure connection to the website",
+            "vulnerabilities": [{
+                "type": "SSL/TLS Error",
+                "severity": "High",
+                "description": "SSL/TLS connection failed",
+                "recommendation": "Check SSL/TLS configuration and certificate"
+            }]
+        }
+    except requests.exceptions.ConnectionError:
+        return {
+            "error": "Connection Error",
+            "message": "Could not connect to the website",
+            "vulnerabilities": [{
+                "type": "Connection Error",
+                "severity": "High",
+                "description": "Failed to establish connection",
+                "recommendation": "Check if the website is accessible"
+            }]
+        }
     except Exception as e:
-        raise Exception(f"{texts['error_scanning']}: {str(e)}")
+        return {
+            "error": "Scan Error",
+            "message": str(e),
+            "vulnerabilities": [{
+                "type": "Scan Error",
+                "severity": "Unknown",
+                "description": f"Error during scan: {str(e)}",
+                "recommendation": "Check the error message and try again"
+            }]
+        }
 
 def analyze_vulnerabilities(scan_results):
-    """Analyze potential vulnerabilities based on scan results"""
+    """Analyze scan results for vulnerabilities and recommend tests based on risk levels"""
     vulnerabilities = []
-    recommendations = []
+    recommendations = set()  # Using a set to prevent duplicates
     
-    # Check for missing security headers
-    if "Security" not in scan_results:
-        vulnerabilities.append({
-            "type": "Security Headers",
-            "severity": "High",
-            "description": "No security headers detected",
-            "recommendation": "Implement security headers like X-Frame-Options, X-XSS-Protection, and X-Content-Type-Options"
-        })
-    
-    # Check for outdated technologies
-    outdated_techs = {
-        "jQuery": "Consider upgrading to modern JavaScript frameworks",
-        "Bootstrap": "Update to latest version for security patches",
-        "WordPress": "Ensure WordPress and plugins are up to date"
+    # Helper function to add recommendation
+    def add_recommendation(test_type, reason, risk_level, description, recommendation, test_key):
+        recommendation_tuple = (test_type, reason, risk_level)
+        if recommendation_tuple not in recommendations:
+            recommendations.add(recommendation_tuple)
+            vulnerabilities.append({
+                "type": test_type,
+                "risk": risk_level,
+                "description": description,
+                "recommendation": recommendation,
+                "test_key": test_key
+            })
+            return True
+        return False
+
+    # Critical Risk Checks
+    if "E-commerce" in scan_results:
+        add_recommendation(
+            "SQL Injection Test",
+            "E-commerce platform detected",
+            "Critical",
+            "E-commerce systems handle sensitive payment data and require thorough security testing",
+            "Run comprehensive SQL injection tests and implement WAF protection",
+            "sql_ecommerce_critical"
+        )
+
+    # High Risk Checks
+    # JavaScript Framework Security
+    if any(tech[0] in ["jQuery", "React", "Vue.js", "Angular"] for techs in scan_results.values() for tech in techs):
+        add_recommendation(
+            "XSS Test",
+            "JavaScript frameworks detected",
+            "High",
+            "JavaScript-heavy applications are common targets for XSS attacks",
+            "Run XSS tests and implement Content Security Policy (CSP)",
+            "xss_js_high"
+        )
+
+    # Server Technology
+    if "Web Servers" in scan_results:
+        server_tech = [tech[0] for tech in scan_results["Web Servers"]]
+        if any(tech in ["Apache", "Nginx", "IIS"] for tech in server_tech):
+            add_recommendation(
+                "DDoS Test",
+                f"Server using {', '.join(server_tech)}",
+                "High",
+                "Web servers need protection against DDoS attacks",
+                "Run DDoS simulation tests and implement rate limiting",
+                "ddos_server_high"
+            )
+
+    # PHP Security
+    if any("PHP" in tech[0] for techs in scan_results.values() for tech in techs):
+        add_recommendation(
+            "SQL Injection Test",
+            "PHP application detected",
+            "High",
+            "PHP applications need proper SQL injection protection",
+            "Run SQL injection tests and use prepared statements",
+            "sql_php_high"
+        )
+
+    # SSL/TLS Security
+    if not any(tech[0] == "HSTS" for techs in scan_results.get("Security", []) for tech in techs):
+        add_recommendation(
+            "SSL Test",
+            "Missing HSTS protection",
+            "High",
+            "Site is vulnerable to SSL/TLS downgrade attacks",
+            "Enable HSTS and configure SSL/TLS properly",
+            "ssl_hsts_high"
+        )
+
+    # Medium Risk Checks
+    # Security Headers
+    required_headers = {
+        "X-Frame-Options": ("Clickjacking Protection", "frame_protection"),
+        "X-XSS-Protection": ("XSS Protection", "xss_protection"),
+        "Content-Security-Policy": ("Content Security", "csp_protection"),
+        "X-Content-Type-Options": ("MIME Sniffing Protection", "mime_protection")
     }
     
-    for category, techs in scan_results.items():
-        if category == "Scanning Details":
-            continue
-            
-        for tech, version, _ in techs:
-            if tech in outdated_techs:
-                vulnerabilities.append({
-                    "type": "Outdated Technology",
-                    "severity": "Medium",
-                    "description": f"Using potentially outdated {tech}",
-                    "recommendation": outdated_techs[tech]
-                })
+    if "Security" in scan_results:
+        present_headers = {tech[0] for tech in scan_results["Security"]}
+        for header, (protection, key) in required_headers.items():
+            if header not in present_headers:
+                add_recommendation(
+                    "Security Header Test",
+                    f"Missing {header}",
+                    "Medium",
+                    f"Site lacks {protection}",
+                    f"Implement {header} header with appropriate values",
+                    f"header_{key}_medium"
+                )
+
+    # Database Security
+    if any(tech["name"] in ["MySQL", "PostgreSQL", "MongoDB"] for tech in scan_results.get("technologies", [])):
+        add_recommendation(
+            "Database Security Test",
+            "Database system detected",
+            "Medium",
+            "Database systems need proper security configuration",
+            "Run database security assessment and implement proper access controls",
+            "db_security_medium"
+        )
+
+    # Low Risk Checks
+    # Information Disclosure
+    if "Server" in scan_results.get("server_info", {}):
+        add_recommendation(
+            "Information Disclosure Test",
+            "Server information visible",
+            "Low",
+            "Server is revealing technology information",
+            "Configure server to hide version information",
+            "info_disclosure_low"
+        )
+
+    # Display recommendations grouped by risk level
+    if vulnerabilities:
+        st.markdown("## " + texts.get("recommended_tests", "Recommended Tests"))
+        
+        # Group vulnerabilities by risk level
+        risk_levels = ["Critical", "High", "Medium", "Low"]
+        for risk_level in risk_levels:
+            risk_vulns = [v for v in vulnerabilities if v["risk"] == risk_level]
+            if risk_vulns:
+                if risk_level == "Critical":
+                    risk_icon = "🚨"
+                elif risk_level == "High":
+                    risk_icon = "⚠️"
+                elif risk_level == "Medium":
+                    risk_icon = "⚡"
+                else:
+                    risk_icon = "ℹ️"
+                    
+                st.markdown(f"### {risk_icon} {risk_level} Risk Level")
+                for vuln in risk_vulns:
+                    with st.expander(f"{vuln['type']}", expanded=True):
+                        st.markdown(f"**Description:** {vuln['description']}")
+                        st.markdown(f"**Recommendation:** {vuln['recommendation']}")
+                        
+                        # Create button with unique key
+                        if st.button(f"Run Test", key=vuln['test_key']):
+                            st.session_state['selected_test'] = vuln['type'].split()[0]
+                            st.experimental_rerun()
+                st.markdown("---")
     
-    # Check for analytics and tracking
-    if "Analytics" not in scan_results:
-        vulnerabilities.append({
-            "type": "Analytics",
-            "severity": "Low",
-            "description": "No analytics tools detected",
-            "recommendation": "Consider implementing analytics for better user behavior tracking"
-        })
-    
-    # Generate test recommendations
-    if "Security" not in scan_results:
-        recommendations.append("XSS Test")
-    if "Databases" in scan_results:
-        recommendations.append("SQL Injection Test")
-    if "Web Servers" in scan_results:
-        recommendations.append("DDoS Test")
-    
-    return vulnerabilities, recommendations
+    return vulnerabilities
 
 # UI Components
 st.title(f"🔍 {texts['page_title']}")
@@ -600,7 +972,7 @@ with col1:
          "Security", "Hosting", "CMS", "E-commerce", "JavaScript Libraries", "Databases"],
         default=["Analytics", "Web Servers", "Programming Languages", "Frameworks"]
     )
-
+    
 with col2:
     scan_depth = st.select_slider(
         texts['depth'],
@@ -612,125 +984,102 @@ with col2:
 if st.button(texts['start_scan']):
     with st.spinner(texts['scanning']):
         try:
-            # Perform the scan based on selected mode
-            if scan_mode == "Basic Scan":
-                scan_results = basic_scan(target_url)
+        # Perform the scan
+            scan_results = scan_website(target_url)
+        
+            # Check if there was an error
+            if "error" in scan_results:
+                st.error(f"Scan Error: {scan_results['message']}")
             else:
-                scan_results = advanced_scan(target_url)
-            
-            # Store in history
-            st.session_state.scan_history.append({
-                "timestamp": datetime.now(),
-                "target": target_url,
-                "mode": scan_mode,
-                "technologies": sum(len(techs) for techs in scan_results.values() if isinstance(techs, list)),
-                "categories": len([k for k, v in scan_results.items() if isinstance(v, list)])
-            })
-            
-            # Display Results
-            st.header(texts['scan_results'])
-            
-            # Summary metrics
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric(texts['tech_detected'], 
-                         sum(len(techs) for techs in scan_results.values() if isinstance(techs, list)))
-            with col2:
-                st.metric(texts['categories_found'], 
-                         len([k for k, v in scan_results.items() if isinstance(v, list)]))
-            with col3:
-                if "Scanning Details" in scan_results:
-                    st.metric(texts['response_time'], 
-                             scan_results["Scanning Details"]["Response Time"])
-            
-            # Detailed results
-            for category, technologies in scan_results.items():
-                if category == "Scanning Details":
-                    continue
-                    
-                with st.expander(f"{category} ({len(technologies)})"):
-                    for tech, version, period in technologies:
-                        st.markdown(f"""
-                        **{tech}**  
-                        {texts['version']}: `{version}`  
-                        {texts['period']}: *{period}*
-                        """)
-            
-            # Scanning Details
-            if "Scanning Details" in scan_results:
-                with st.expander(texts['scanning_details']):
-                    for key, value in scan_results["Scanning Details"].items():
-                        st.write(f"**{key}:** {value}")
-            
-            # SSL Details (only in advanced scan)
-            if scan_mode == "Advanced Scan" and "SSL Details" in scan_results:
-                with st.expander("🔒 SSL/TLS Certificate Details"):
-                    for key, value in scan_results["SSL Details"].items():
-                        st.write(f"**{key}:** {value}")
-            
-            # Technology Distribution
-            tech_distribution = {
-                category: len(techs) 
-                for category, techs in scan_results.items() 
-                if category != "Scanning Details"
-            }
-            
-            if tech_distribution:
-                fig = px.pie(
-                    values=list(tech_distribution.values()),
-                    names=list(tech_distribution.keys()),
-                    title=texts['tech_distribution']
-                )
-                st.plotly_chart(fig, use_container_width=True)
-            
-            # Vulnerability Analysis (only in advanced scan)
-            if scan_mode == "Advanced Scan":
-                st.header("Vulnerability Analysis")
-                vulnerabilities, recommendations = analyze_vulnerabilities(scan_results)
+        # Store in history
+        st.session_state.scan_history.append({
+                    "timestamp": datetime.now(),
+                    "target": target_url,
+                    "mode": scan_mode,
+                    "technologies": len(scan_results.get("technologies", [])),
+                    "vulnerabilities": len(scan_results.get("vulnerabilities", [])),
+        })
+        
+        # Display Results
+                st.header(texts['scan_results'])
                 
+                # Summary metrics
+        col1, col2 = st.columns(2)
+                with col1:
+                    st.metric(texts['tech_detected'], len(scan_results.get("technologies", [])))
+                with col2:
+                    st.metric("Vulnerabilities", len(scan_results.get("vulnerabilities", [])))
+                
+                # Display Vulnerabilities first if any exist
+                vulnerabilities = scan_results.get("vulnerabilities", [])
                 if vulnerabilities:
-                    for vuln in vulnerabilities:
-                        with st.expander(f"⚠️ {vuln['type']} - {vuln['severity']} Risk"):
-                            st.write(f"**Description:** {vuln['description']}")
-                            st.write(f"**Recommendation:** {vuln['recommendation']}")
+                    with st.expander("🚨 Vulnerabilities", expanded=True):
+                        for vuln in vulnerabilities:
+                            st.markdown(f"""
+                            ### ⚠️ {vuln['type']} - {vuln['severity']} Risk
+                            **Description:** {vuln['description']}  
+                            **Recommendation:** {vuln['recommendation']}
+                            ---
+                            """)
                 else:
-                    st.success("No significant vulnerabilities detected in the scan")
+                    st.success("No vulnerabilities detected!")
                 
-                # Test Recommendations
-                st.header("Recommended Tests")
-                if recommendations:
-                    st.write("Based on the scan results, we recommend running the following tests:")
-                    for test in recommendations:
-                        st.write(f"- {test}")
+                # Display Test Recommendations
+                st.subheader("🎯 Recommended Tests")
+                analyze_vulnerabilities(scan_results)
+                
+                # Display Technologies
+                technologies = scan_results.get("technologies", [])
+                if technologies:
+                    with st.expander("🔍 Detected Technologies", expanded=True):
+                        for tech in technologies:
+                            st.markdown(f"""
+                            ### {tech['name']} ({tech['category']})
+                            **Version:** `{tech['version']}`  
+                            **Confidence:** {tech['confidence']}%  
+                            **Period:** {tech['period']}
+                            ---
+                            """)
+                
+                # Display Server Information
+                server_info = scan_results.get("server_info", {})
+                if server_info:
+                    with st.expander("🖥️ Server Information"):
+                        for key, value in server_info.items():
+                            st.markdown(f"**{key.title()}:** {value}")
+                
+                # Display SSL Information
+                ssl_info = scan_results.get("ssl_info", {})
+                if ssl_info:
+                    with st.expander("🔒 SSL/TLS Certificate Details"):
+                        for key, value in ssl_info.items():
+                            if key != "Vulnerabilities":  # Skip vulnerabilities as they're shown above
+                                st.markdown(f"**{key}:** {value}")
+                
+                # Display Headers
+                headers = scan_results.get("headers", {})
+                if headers:
+                    with st.expander("📋 HTTP Headers"):
+                        for header, value in headers.items():
+                            st.markdown(f"**{header}:** {value}")
+                
+                # Technology Distribution
+                if technologies:
+                    tech_by_category = {}
+                    for tech in technologies:
+                        category = tech["category"]
+                        tech_by_category[category] = tech_by_category.get(category, 0) + 1
                     
-                    # Test selection
-                    selected_test = st.selectbox(
-                        "Select a test to run:",
-                        recommendations
-                    )
-                    
-                    if st.button("Run Selected Test"):
-                        if selected_test == "XSS Test":
-                            st.switch_page("pages/2_XSS.py")
-                        elif selected_test == "SQL Injection Test":
-                            st.switch_page("pages/3_SQL.py")
-                        elif selected_test == "DDoS Test":
-                            st.switch_page("pages/4_DDoS.py")
-                else:
-                    st.info("No specific tests recommended based on current scan results")
-            
-            # File Scan Results (only in advanced scan)
-            if scan_mode == "Advanced Scan" and "Files" in scan_results:
-                with st.expander("📁 File Scan Results"):
-                    if scan_results["Files"]:
-                        st.write("Found Files:")
-                        for file in scan_results["Files"]:
-                            st.write(f"- {file['name']} ({file['size']} bytes)")
-                    else:
-                        st.info("No additional files found")
-            
+                    if tech_by_category:
+                        fig = px.pie(
+                            values=list(tech_by_category.values()),
+                            names=list(tech_by_category.keys()),
+                            title=texts['tech_distribution']
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+        
         except Exception as e:
-            st.error(str(e))
+            st.error(f"Error during scan: {str(e)}")
 
 # Scan History
 st.header(texts['scan_history'])
@@ -739,12 +1088,13 @@ if st.session_state.scan_history:
     st.dataframe(history_df, use_container_width=True)
     
     # History visualization
-    fig = px.line(
-        history_df,
-        x="timestamp",
-        y=["technologies", "categories"],
-        title=texts['scan_history']
-    )
+    if len(history_df) > 0:
+        fig = px.line(
+            history_df,
+            x="timestamp",
+            y=["technologies", "vulnerabilities"],
+            title=texts['scan_history']
+        )
     st.plotly_chart(fig, use_container_width=True)
 else:
     st.info(texts['no_history']) 
