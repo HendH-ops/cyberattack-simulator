@@ -268,7 +268,19 @@ def analyze_ssl_certificate(hostname):
                 # Get certificate
                 cert = ssock.getpeercert()
                 cert_der = ssock.getpeercert(binary_form=True)
-                x509 = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_ASN1, cert_der)
+                
+                try:
+                    x509 = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_ASN1, cert_der)
+                except Exception as e:
+                    return {
+                        "Error": f"Failed to load certificate: {str(e)}",
+                        "Vulnerabilities": [{
+                            "type": "SSL/TLS Error",
+                            "severity": "Medium",
+                            "description": f"Certificate analysis error: {str(e)}",
+                            "recommendation": "Check certificate format and validity"
+                        }]
+                    }
                 
                 # Extract certificate information
                 issuer = dict(x[0] for x in cert['issuer'])
