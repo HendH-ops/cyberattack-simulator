@@ -67,6 +67,37 @@ Vali rünnaku tüüp testimise alustamiseks:
     }
 }
 
+# Authentication
+def check_password():
+    """Returns `True` if the user had the correct password."""
+
+    def password_entered():
+        """Checks whether a password entered by the user is correct."""
+        if st.session_state["username"] == "simulator" and st.session_state["password"] == "tallinn2025":
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # Don't store password
+            del st.session_state["username"]  # Don't store username
+        else:
+            st.session_state["password_correct"] = False
+
+    # First run, show inputs for username + password.
+    if "password_correct" not in st.session_state:
+        st.text_input("Username", on_change=password_entered, key="username")
+        st.text_input("Password", type="password", on_change=password_entered, key="password")
+        return False
+    # Password not correct, show input + error.
+    elif not st.session_state["password_correct"]:
+        st.text_input("Username", on_change=password_entered, key="username")
+        st.text_input("Password", type="password", on_change=password_entered, key="password")
+        st.error("😕 User not known or password incorrect")
+        return False
+    # Password correct.
+    else:
+        return True
+
+if not check_password():
+    st.stop()  # Do not continue if check_password is not True.
+
 # Initialize session state
 if 'attack_history' not in st.session_state:
     st.session_state.attack_history = []
