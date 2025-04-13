@@ -2,7 +2,7 @@
 
 - Author: Hendrik Hollo
 
-A web-based cyber attack simulation tool with AI-powered analysis. This project consists of a React frontend and Flask backend.
+A web-based cyber attack simulation tool with AI-powered analysis built with Streamlit.
 
 ## Features
 
@@ -14,62 +14,42 @@ A web-based cyber attack simulation tool with AI-powered analysis. This project 
 ## Project Structure
 
 cyberattack-simulator/
-├── backend/
-│ ├── app.py # Flask backend server
-│ └── requirements.txt # Python dependencies
-└── frontend/
-├── public/ # Static files
-├── src/ # React source code
-└── package.json # Node.js dependencies
-
+├── Home.py           # Streamlit application
+├── requirements.txt  # Python dependencies
+└── README.md        # Project documentation
 
 ## Setup Instructions
 
-### Backend Setup
-
 1. Create and activate a Python virtual environment:
 ```bash
+# Create virtual environment
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Activate virtual environment
+# On Linux/Mac:
+source venv/bin/activate
+# On Windows:
+# venv\Scripts\activate
 ```
 
 2. Install dependencies:
 ```bash
-cd backend
 pip install -r requirements.txt
 ```
 
-3. Start the Flask server:
+3. Run the Streamlit application:
 ```bash
-python app.py
+streamlit run Home.py
 ```
 
-### Frontend Setup
-
-1. Install Node.js dependencies:
-```bash
-cd frontend
-npm install
-```
-
-2. Start the development server:
-```bash
-npm start
-```
-
-The application will be available at http://localhost:3000
+The application will be available at http://localhost:8501
 
 ## Technologies Used
 
-- Frontend:
-  - React
-  - Ant Design
-  - JavaScript/ES6+
-
-- Backend:
-  - Flask
-  - Python
-  - scikit-learn (for AI analysis)
+- Streamlit
+- Python
+- scikit-learn (for AI analysis)
+- NumPy (for data processing)
 
 ## Contributing
 
