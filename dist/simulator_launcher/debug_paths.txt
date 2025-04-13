@@ -1,5 +1,0 @@
-BASE_DIR: C:\Users\hendr\cyberattack-simulator\dist\simulator_launcher
-Flask EXE: C:\Users\hendr\cyberattack-simulator\dist\simulator_launcher\simulator_launcher.exe
-Flask App: C:\Users\hendr\cyberattack-simulator\dist\simulator_launcher\backend\app.py
-Backend path: C:\Users\hendr\cyberattack-simulator\dist\simulator_launcher\backend
-Frontend path: C:\Users\hendr\cyberattack-simulator\dist\simulator_launcher\frontend
