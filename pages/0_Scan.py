@@ -8,32 +8,35 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-import requests
-import json
-import time
-import random
-import socket
-import ssl
-# import dns.resolver  # Temporarily commented out
-import re
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
-from datetime import datetime
-from urllib.parse import urlparse
-from bs4 import BeautifulSoup
-import concurrent.futures
-import threading
-import queue
-import os
-import sys
-import subprocess
-import platform
-# import psutil  # Temporarily commented out
-import logging
-import traceback
-from typing import Dict, List, Tuple, Optional, Any, Union
-from utils import init_language, COMMON_TRANSLATIONS
+# Try to import required modules
+try:
+    import requests
+    import json
+    import time
+    import random
+    import socket
+    import ssl
+    import re
+    import pandas as pd
+    import plotly.express as px
+    import plotly.graph_objects as go
+    from datetime import datetime
+    from urllib.parse import urlparse
+    from bs4 import BeautifulSoup
+    import concurrent.futures
+    import threading
+    import queue
+    import os
+    import sys
+    import subprocess
+    import platform
+    import logging
+    import traceback
+    from typing import Dict, List, Tuple, Optional, Any, Union
+    from utils import init_language, COMMON_TRANSLATIONS
+except ImportError as e:
+    st.error(f"Error importing required modules: {str(e)}")
+    st.stop()
 
 # Initialize language
 lang = init_language()
