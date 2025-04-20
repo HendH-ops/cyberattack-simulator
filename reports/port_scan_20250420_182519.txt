@@ -1,0 +1,24 @@
+Port Scan Report
+===============
+
+Target: estateguru.co
+Scan Time: 2025-04-20 18:25:19
+IP Address: 35.214.207.109
+
+Open Ports:
+==========
+Port 21: FTP
+Port 80: HTTP
+Port 110: POP3
+Port 143: IMAP
+Port 443: HTTPS
+Port 465: Unknown
+Port 587: Unknown (220-c126382.sgvps.net ESMTP #2 Sun, 20 Apr 2025 15:25:09 +0000 
+220-We do not authorize the use of this system to transport unsolicited, 
+220 and/or bulk e-mail.)
+Port 995: Unknown
+
+Scan Summary:
+============
+Total ports scanned: 8
+Open ports found: 8

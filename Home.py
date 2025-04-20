@@ -4,7 +4,7 @@ import random
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
-from utils import init_language, COMMON_TRANSLATIONS
+from utils.display_utils import init_language, COMMON_TRANSLATIONS
 
 # Page config
 st.set_page_config(

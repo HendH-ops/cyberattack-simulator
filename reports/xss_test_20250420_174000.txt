@@ -1,0 +1,15 @@
+XSS Vulnerability Test Report
+Generated: 2025-04-20 17:40:00.777540
+Target URL: http://localhost:5001
+
+Reflected XSS Results:
+Vulnerable: False
+
+Stored XSS Results:
+Vulnerable: False
+
+DOM XSS Results:
+Vulnerable: True
+
+API XSS Results:
+Vulnerable: True

@@ -33,7 +33,7 @@ try:
     import logging
     import traceback
     from typing import Dict, List, Tuple, Optional, Any, Union
-    from utils import init_language, COMMON_TRANSLATIONS
+    from utils.display_utils import init_language, COMMON_TRANSLATIONS
 except ImportError as e:
     st.error(f"Error importing required modules: {str(e)}")
     st.stop()
@@ -663,54 +663,67 @@ def simulate_scan(url):
     }
 
 def scan_website(url):
-    """Enhanced website scanning function"""
-    # Validate URL
-    cleaned_url, error = validate_url(url)
-    if error:
-        return {"error": error}
-    
-    # Check if running in Streamlit Cloud
-    is_cloud = os.getenv('STREAMLIT_RUNTIME') == 'cloud'
-    
-    if is_cloud:
-        st.info("Running in Streamlit Cloud - using simulation mode for demonstration.")
-        return simulate_scan(cleaned_url)
-    
+    """Scan website for technologies and vulnerabilities"""
     try:
-        # Try real scan first (only in local environment)
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-        
-        response = requests.get(cleaned_url, headers=headers, timeout=10, verify=True)
-        html_content = response.text.lower()
+        # Validate URL
+        cleaned_url, error = validate_url(url)
+        if error:
+            return {"error": error}
         
         # Initialize results
         results = {
             "url": cleaned_url,
             "technologies": {},
             "server_info": {},
-            "headers": dict(response.headers),
+            "headers": {},
             "vulnerabilities": [],
             "is_simulated": False
         }
+        
+        # Make HTTP request
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
+        response = requests.get(cleaned_url, headers=headers, timeout=10, verify=True)
+        html_content = response.text.lower()
+        results["headers"] = dict(response.headers)
         
         # Detect technologies
         techs = detect_technologies(html_content, response.headers, {}, response)
         if techs:
             results["technologies"] = techs
         
+        # Analyze SSL certificate
+        hostname = urlparse(cleaned_url).netloc
+        results["ssl_info"] = analyze_ssl_certificate(hostname)
+        
+        # Scan for common files
+        results["file_scan"] = scan_files(cleaned_url)
+        
+        # Analyze network traffic
+        results["network_analysis"] = analyze_network_traffic(cleaned_url, response)
+        
+        # Analyze SEO
+        results["seo_analysis"] = analyze_seo(html_content)
+        
+        # Check accessibility
+        results["accessibility"] = analyze_accessibility(html_content)
+        
+        # Analyze performance
+        results["performance"] = analyze_performance(response, html_content)
+        
+        # Scan ports
+        results["port_scan"] = scan_ports(hostname)
+        
         # Analyze vulnerabilities
         results["vulnerabilities"] = analyze_vulnerabilities(results)
         
         return results
         
-    except requests.exceptions.RequestException as e:
-        st.warning("Could not perform real scan, showing simulated results instead.")
-        return simulate_scan(cleaned_url)
     except Exception as e:
-        st.warning("Scanning error occurred, showing simulated results instead.")
-        return simulate_scan(cleaned_url)
+        logging.error(f"Error scanning website: {str(e)}")
+        return {"error": f"Error scanning website: {str(e)}"}
 
 def display_vulnerability(vuln, level):
     """Display a single vulnerability in the UI"""
@@ -762,76 +775,85 @@ def analyze_vulnerabilities(scan_results):
                 "test_key": test_key
             })
 
-    # Critical risks
-    if "E-commerce" in scan_results:
-        add_rec(
-            "SQL Injection Test",
-            "E-commerce platform detected",
-            "Critical",
-            "E-commerce systems handle sensitive payment data",
-            "Run SQL injection tests and implement WAF",
-            "sql_ecommerce"
-        )
+    # Critical risks - SSL/TLS
+    if "ssl_info" in scan_results:
+        ssl_info = scan_results["ssl_info"]
+        if isinstance(ssl_info, dict):
+            if "Vulnerabilities" in ssl_info:
+                for vuln in ssl_info["Vulnerabilities"]:
+                    add_rec(
+                        "SSL/TLS Test",
+                        "SSL certificate issues detected",
+                        "Critical",
+                        vuln.get("description", "SSL vulnerability"),
+                        vuln.get("recommendation", "Fix SSL configuration"),
+                        "ssl_vuln"
+                    )
 
-    # High risks - JavaScript frameworks
-    js_frameworks = ["jQuery", "React", "Vue.js", "Angular"]
-    if any(tech[0] in js_frameworks for techs in scan_results.values() for tech in techs):
-        add_rec(
-            "XSS Test",
-            "JavaScript frameworks detected",
-            "High",
-            "JavaScript applications are XSS targets",
-            "Run XSS tests and implement CSP",
-            "xss_js"
-        )
+    # High risks - Security headers
+    if "headers" in scan_results:
+        headers = scan_results["headers"]
+        if isinstance(headers, dict):
+            security_headers = {
+                "X-Frame-Options": ("Clickjacking Protection", "frame"),
+                "X-XSS-Protection": ("XSS Protection", "xss"),
+                "Content-Security-Policy": ("Content Security", "csp"),
+                "X-Content-Type-Options": ("MIME Sniffing Protection", "mime")
+            }
+            
+            for header, (protection, key) in security_headers.items():
+                if header not in headers:
+                    add_rec(
+                        "Security Test",
+                        f"Missing {header}",
+                        "High",
+                        f"Site lacks {protection}",
+                        f"Add {header} header",
+                        f"header_{key}"
+                    )
 
-    # High risks - Server technology
-    if "Web Servers" in scan_results:
-        server_tech = [tech[0] for tech in scan_results["Web Servers"]]
-        if any(server in ["Apache", "Nginx", "IIS"] for server in server_tech):
-            add_rec(
-                "DDoS Test",
-                f"Server using {', '.join(server_tech)}",
-                "High",
-                "Web servers need DDoS protection",
-                "Run DDoS tests and implement rate limiting",
-                "ddos_server"
-            )
-
-    # High risks - PHP
-    if any("PHP" in tech[0] for techs in scan_results.values() for tech in techs):
-        add_rec(
-            "SQL Injection Test",
-            "PHP application detected",
-            "High",
-            "PHP apps need SQL injection protection",
-            "Run SQL tests and use prepared statements",
-            "sql_php"
-        )
-
-    # Medium risks - Security headers
-    headers = {
-        "X-Frame-Options": ("Clickjacking Protection", "frame"),
-        "X-XSS-Protection": ("XSS Protection", "xss"),
-        "Content-Security-Policy": ("Content Security", "csp"),
-        "X-Content-Type-Options": ("MIME Sniffing Protection", "mime")
-    }
-    
-    if "Security" in scan_results:
-        present = {tech[0] for tech in scan_results["Security"]}
-        for header, (protection, key) in headers.items():
-            if header not in present:
+    # High risks - Open ports
+    if "port_scan" in scan_results:
+        port_info = scan_results["port_scan"]
+        if isinstance(port_info, dict) and "open_ports" in port_info:
+            if len(port_info["open_ports"]) > 2:
                 add_rec(
-                    "Security Test",
-                    f"Missing {header}",
-                    "Medium",
-                    f"Site lacks {protection}",
-                    f"Add {header} header",
-                    f"header_{key}"
+                    "Port Security Test",
+                    "Multiple open ports detected",
+                    "High",
+                    f"Found {len(port_info['open_ports'])} open ports",
+                    "Close unnecessary ports and implement firewall rules",
+                    "port_security"
                 )
 
-    # Display results
-    display_vulnerabilities(vulnerabilities)
+    # Medium risks - Performance
+    if "performance" in scan_results:
+        perf_info = scan_results["performance"]
+        if isinstance(perf_info, dict) and "Page Size" in perf_info:
+            if perf_info["Page Size"]["total"] > 5000000:  # 5MB
+                add_rec(
+                    "Performance Test",
+                    "Large page size detected",
+                    "Medium",
+                    "Page size exceeds 5MB",
+                    "Optimize images and minify resources",
+                    "performance"
+                )
+
+    # Low risks - Accessibility
+    if "accessibility" in scan_results:
+        acc_info = scan_results["accessibility"]
+        if isinstance(acc_info, dict) and "Images" in acc_info:
+            if acc_info["Images"]["without_alt"] > 0:
+                add_rec(
+                    "Accessibility Test",
+                    "Images without alt text",
+                    "Low",
+                    f"Found {acc_info['Images']['without_alt']} images without alt text",
+                    "Add descriptive alt text to all images",
+                    "accessibility"
+                )
+
     return vulnerabilities
 
 def quick_scan(url):
@@ -1682,24 +1704,13 @@ def get_system_info() -> Dict[str, Any]:
 st.title("🔍 " + texts["page_title"])
 st.markdown(texts["description"])
 
-# Input with default value and scan type selection
-col1, col2 = st.columns([3, 1])
-with col1:
-    url = st.text_input("Enter website URL:", "harvard.edu")
-with col2:
-    scan_type = st.radio(
-        texts["scan_type"],
-        options=["quick", "detailed"],
-        format_func=lambda x: texts["quick_scan"] if x == "quick" else texts["detailed_scan"]
-    )
+# Input with default value
+url = st.text_input("Enter website URL:", "bing.com")
 
 # Scan button
 if st.button(texts["start_scan"]):
     with st.spinner(texts["scanning"]):
-        if scan_type == texts["quick_scan"]:
-            results = quick_scan(url)
-        else:
-            results = detailed_scan(url)
+        results = scan_website(url)
         
         if "error" in results:
             st.error(f"Error: {results['error']}")
@@ -1707,225 +1718,201 @@ if st.button(texts["start_scan"]):
             # Display results
             st.success(texts["scan_completed"])
             
-            if results.get("is_simulated"):
-                st.info(texts["simulated_note"])
-            
             # Show response time
-            st.metric(texts["response_time"], f"{results['response_time']:.2f} {texts['seconds']}")
+            st.metric(texts["response_time"], f"{results.get('response_time', 0):.2f} {texts['seconds']}")
             
-            # Show technologies based on scan type
-            if scan_type == texts["quick_scan"]:
-                st.subheader(texts["basic_overview"])
-                st.markdown(f"*{texts['quick_overview']}*")
-                for category, value in results["technologies"].items():
-                    if isinstance(value, dict):
-                        with st.expander(category, expanded=True):
-                            st.markdown(f"*{get_category_description(category)}*")
-                            for k, v in value.items():
-                                st.markdown(f"- **{k}**: {v}")
-                    else:
-                        st.markdown(f"- **{category}**: {value}")
-            else:
-                # Detailed results display
-                st.subheader(texts["detected_tech"])
-                st.markdown(f"*{texts['comprehensive_analysis']}*")
-                for category, techs in results["technologies"].items():
-                    with st.expander(f"{category} ({len(techs)})", expanded=True):
-                        st.markdown(f"*{get_category_description(category)}*")
-                        for tech in techs:
-                            name, version, status = tech
-                            st.markdown(f"- **{name}**: {version} ({status})")
-                
-                # AI Recommendations
-                st.subheader(texts["ai_recommendations"])
-                st.markdown(f"*{texts['recommendations_based']}*")
-                
-                recommendations = get_ai_recommendations(results)
-                risk_colors = {
-                    "Critical": "red",
-                    "High": "orange",
-                    "Medium": "yellow",
-                    "Low": "green"
-                }
-                
-                for risk_level in ["Critical", "High", "Medium", "Low"]:
-                    risk_recommendations = [r for r in recommendations if r["risk"] == risk_level]
-                    if risk_recommendations:
-                        st.markdown(f"### {risk_level} {texts['risk_tests']}")
-                        for rec in risk_recommendations:
-                            with st.expander(f"🔴 {rec['test']}", expanded=True):
-                                st.markdown(f"**{texts['description']}:** {rec['description']}")
-                                st.markdown(f"**{texts['reason']}:** {rec['reason']}")
-                                st.markdown(f"**{texts['suggested_tests']}:**")
-                                st.markdown(f"- {texts['vulnerability_scanning']} {rec['test'].lower()}")
-                                st.markdown(f"- {texts['configuration_review']}")
-                                st.markdown(f"- {texts['automated_testing']}")
-                                
-                                # Update the button click handler
-                                if st.button(f"{texts['go_to_test']} {rec['test']}", key=f"btn_{rec['test']}"):
-                                    test_function = test_mapping.get(rec['test'])
-                                    if test_function:
-                                        with st.spinner(f"Running {rec['test']}..."):
-                                            test_results = test_function(url)
-                                            st.subheader(f"{rec['test']} Results")
-                                            
-                                            # Display test results in a more readable format
-                                            if isinstance(test_results, dict):
-                                                for key, value in test_results.items():
-                                                    if isinstance(value, dict):
-                                                        st.markdown(f"**{key}:**")
-                                                        for subkey, subvalue in value.items():
-                                                            st.markdown(f"- {subkey}: {subvalue}")
-                                                    elif isinstance(value, list):
-                                                        st.markdown(f"**{key}:**")
-                                                        for item in value:
-                                                            st.markdown(f"- {item}")
-                                                    else:
-                                                        st.markdown(f"**{key}:** {value}")
-                                            else:
-                                                st.json(test_results)
-                                    else:
-                                        st.info(texts["test_not_implemented"])
-                
-                # Network Analysis
-                if "network_analysis" in results:
-                    with st.expander(texts["network_analysis"], expanded=True):
-                        st.markdown(f"*{texts['network_description']}*")
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            st.markdown(f"### {texts['connection_details']}")
-                            st.markdown(f"*{texts['connection_description']}*")
-                            st.json(results["network_analysis"]["Connection"])
-                            
-                            st.markdown(f"### {texts['performance_metrics']}")
-                            st.markdown(f"*{texts['performance_description']}*")
-                            st.json(results["network_analysis"]["Performance"])
-                        
-                        with col2:
-                            st.markdown(f"### {texts['security_headers']}")
-                            st.markdown(f"*{texts['security_description']}*")
-                            st.json(results["network_analysis"]["Security"])
-                            
-                            st.markdown(f"### {texts['dns_info']}")
-                            st.markdown(f"*{texts['dns_description']}*")
-                            st.json(results["network_analysis"]["DNS Lookup"])
-                
-                # SSL Information
-                if "ssl_info" in results:
-                    with st.expander(texts["ssl_info"], expanded=True):
-                        st.markdown(f"*{texts['ssl_description']}*")
-                        st.markdown("""
-                        - **{texts['issuer']}**: {results['ssl_info']['Issuer']}
-                        - **{texts['valid_until']}**: {results['ssl_info']['Valid Until']}
-                        - **{texts['protocol']}**: {results['ssl_info']['Protocol']}
-                        - **{texts['cipher']}**: {results['ssl_info']['Cipher']}
-                        """)
-                        for key, value in results["ssl_info"].items():
-                            if key != "Vulnerabilities":
-                                st.markdown(f"- **{key}**: {value}")
-                
-                # SEO Analysis
-                if "seo_analysis" in results:
-                    with st.expander(texts["seo_analysis"], expanded=True):
-                        st.markdown(f"*{texts['seo_description']}*")
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            st.markdown(f"### {texts['meta_tags']}")
-                            st.markdown(f"*{texts['meta_description']}*")
-                            st.json(results["seo_analysis"]["Meta Tags"])
-                            
-                            st.markdown(f"### {texts['headers_structure']}")
-                            st.markdown(f"*{texts['headers_description']}*")
-                            st.json(results["seo_analysis"]["Headers"])
-                        
-                        with col2:
-                            st.markdown(f"### {texts['links_analysis']}")
-                            st.markdown(f"*{texts['links_description']}*")
-                            st.json(results["seo_analysis"]["Links"])
-                            
-                            st.markdown(f"### {texts['image_optimization']}")
-                            st.markdown(f"*{texts['image_description']}*")
-                            st.json(results["seo_analysis"]["Images"])
+            # Show technologies
+            st.subheader(texts["detected_tech"])
+            st.markdown(f"*{texts['comprehensive_analysis']}*")
+            for category, techs in results["technologies"].items():
+                with st.expander(f"{category} ({len(techs)})", expanded=True):
+                    st.markdown(f"*{get_category_description(category)}*")
+                    for tech in techs:
+                        name, version, status = tech
+                        st.markdown(f"- **{name}**: {version} ({status})")
             
-                # Accessibility Check
-                if "accessibility" in results:
-                    with st.expander(texts["accessibility_analysis"], expanded=True):
-                        st.markdown(f"*{texts['accessibility_description']}*")
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            st.markdown(f"### {texts['aria_implementation']}")
-                            st.markdown(f"*{texts['aria_description']}*")
-                            st.json(results["accessibility"]["ARIA"])
-                            
-                            st.markdown(f"### {texts['form_accessibility']}")
-                            st.markdown(f"*{texts['form_description']}*")
-                            st.json(results["accessibility"]["Forms"])
-                        
-                        with col2:
-                            st.markdown(f"### {texts['image_accessibility']}")
-                            st.markdown(f"*{texts['image_access_description']}*")
-                            st.json(results["accessibility"]["Images"])
-                            
-                            st.markdown(f"### {texts['keyboard_navigation']}")
-                            st.markdown(f"*{texts['keyboard_description']}*")
-                            st.json(results["accessibility"]["Keyboard Navigation"])
+            # AI Recommendations
+            st.subheader(texts["ai_recommendations"])
+            st.markdown(f"*{texts['recommendations_based']}*")
             
-                # Performance Analysis
-                if "performance" in results:
-                    with st.expander(texts["performance_analysis"], expanded=True):
+            recommendations = get_ai_recommendations(results)
+            risk_colors = {
+                "Critical": "red",
+                "High": "orange",
+                "Medium": "yellow",
+                "Low": "green"
+            }
+            
+            for risk_level in ["Critical", "High", "Medium", "Low"]:
+                risk_recommendations = [r for r in recommendations if r["risk"] == risk_level]
+                if risk_recommendations:
+                    st.markdown(f"### {risk_level} {texts['risk_tests']}")
+                    for rec in risk_recommendations:
+                        with st.expander(f"🔴 {rec['test']}", expanded=True):
+                            st.markdown(f"**{texts['description']}:** {rec['description']}")
+                            st.markdown(f"**{texts['reason']}:** {rec['reason']}")
+                            st.markdown(f"**{texts['suggested_tests']}:**")
+                            st.markdown(f"- {texts['vulnerability_scanning']} {rec['test'].lower()}")
+                            st.markdown(f"- {texts['configuration_review']}")
+                            st.markdown(f"- {texts['automated_testing']}")
+                            
+                            if st.button(f"{texts['go_to_test']} {rec['test']}", key=f"btn_{rec['test']}"):
+                                test_function = test_mapping.get(rec['test'])
+                                if test_function:
+                                    with st.spinner(f"Running {rec['test']}..."):
+                                        test_results = test_function(url)
+                                        st.subheader(f"{rec['test']} Results")
+                                        
+                                        if isinstance(test_results, dict):
+                                            for key, value in test_results.items():
+                                                if isinstance(value, dict):
+                                                    st.markdown(f"**{key}:**")
+                                                    for subkey, subvalue in value.items():
+                                                        st.markdown(f"- {subkey}: {subvalue}")
+                                                elif isinstance(value, list):
+                                                    st.markdown(f"**{key}:**")
+                                                    for item in value:
+                                                        st.markdown(f"- {item}")
+                                                else:
+                                                    st.markdown(f"**{key}:** {value}")
+                                        else:
+                                            st.json(test_results)
+                                else:
+                                    st.info(texts["test_not_implemented"])
+            
+            # Network Analysis
+            if "network_analysis" in results:
+                with st.expander(texts["network_analysis"], expanded=True):
+                    st.markdown(f"*{texts['network_description']}*")
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown(f"### {texts['connection_details']}")
+                        st.markdown(f"*{texts['connection_description']}*")
+                        st.json(results["network_analysis"]["Connection"])
+                        
+                        st.markdown(f"### {texts['performance_metrics']}")
                         st.markdown(f"*{texts['performance_description']}*")
+                        st.json(results["network_analysis"]["Performance"])
+                    
+                    with col2:
+                        st.markdown(f"### {texts['security_headers']}")
+                        st.markdown(f"*{texts['security_description']}*")
+                        st.json(results["network_analysis"]["Security"])
+                        
+                        st.markdown(f"### {texts['dns_info']}")
+                        st.markdown(f"*{texts['dns_description']}*")
+                        st.json(results["network_analysis"]["DNS Lookup"])
+            
+            # SSL Information
+            if "ssl_info" in results:
+                with st.expander(texts["ssl_info"], expanded=True):
+                    st.markdown(f"*{texts['ssl_description']}*")
+                    for key, value in results["ssl_info"].items():
+                        if key != "Vulnerabilities":
+                            st.markdown(f"- **{key}**: {value}")
+            
+            # SEO Analysis
+            if "seo_analysis" in results:
+                with st.expander(texts["seo_analysis"], expanded=True):
+                    st.markdown(f"*{texts['seo_description']}*")
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown(f"### {texts['meta_tags']}")
+                        st.markdown(f"*{texts['meta_description']}*")
+                        st.json(results["seo_analysis"]["Meta Tags"])
+                        
+                        st.markdown(f"### {texts['headers_structure']}")
+                        st.markdown(f"*{texts['headers_description']}*")
+                        st.json(results["seo_analysis"]["Headers"])
+                    
+                    with col2:
+                        st.markdown(f"### {texts['links_analysis']}")
+                        st.markdown(f"*{texts['links_description']}*")
+                        st.json(results["seo_analysis"]["Links"])
+                        
+                        st.markdown(f"### {texts['image_optimization']}")
+                        st.markdown(f"*{texts['image_description']}*")
+                        st.json(results["seo_analysis"]["Images"])
+            
+            # Accessibility Check
+            if "accessibility" in results:
+                with st.expander(texts["accessibility_analysis"], expanded=True):
+                    st.markdown(f"*{texts['accessibility_description']}*")
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown(f"### {texts['aria_implementation']}")
+                        st.markdown(f"*{texts['aria_description']}*")
+                        st.json(results["accessibility"]["ARIA"])
+                        
+                        st.markdown(f"### {texts['form_accessibility']}")
+                        st.markdown(f"*{texts['form_description']}*")
+                        st.json(results["accessibility"]["Forms"])
+                    
+                    with col2:
+                        st.markdown(f"### {texts['image_accessibility']}")
+                        st.markdown(f"*{texts['image_access_description']}*")
+                        st.json(results["accessibility"]["Images"])
+                        
+                        st.markdown(f"### {texts['keyboard_navigation']}")
+                        st.markdown(f"*{texts['keyboard_description']}*")
+                        st.json(results["accessibility"]["Keyboard Navigation"])
+            
+            # Performance Analysis
+            if "performance" in results:
+                with st.expander(texts["performance_analysis"], expanded=True):
+                    st.markdown(f"*{texts['performance_description']}*")
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown(f"### {texts['page_size']}")
+                        st.markdown(f"*{texts['page_size_description']}*")
+                        st.json(results["performance"]["Page Size"])
+                        
+                        st.markdown(f"### {texts['resource_count']}")
+                        st.markdown(f"*{texts['resource_description']}*")
+                        st.json(results["performance"]["Resources"])
+                    
+                    with col2:
+                        st.markdown(f"### {texts['loading_times']}")
+                        st.markdown(f"*{texts['loading_description']}*")
+                        st.json(results["performance"]["Loading"])
+                        
+                        st.markdown(f"### {texts['caching']}")
+                        st.markdown(f"*{texts['caching_description']}*")
+                        st.json(results["performance"]["Caching"])
+            
+            # Port Scan Results
+            if "port_scan" in results:
+                with st.expander(texts["port_scan"], expanded=True):
+                    st.markdown(f"*{texts['port_description']}*")
+                    if "error" in results["port_scan"]:
+                        st.error(results["port_scan"]["error"])
+                    else:
                         col1, col2 = st.columns(2)
                         
                         with col1:
-                            st.markdown(f"### {texts['page_size']}")
-                            st.markdown(f"*{texts['page_size_description']}*")
-                            st.json(results["performance"]["Page Size"])
-                            
-                            st.markdown(f"### {texts['resource_count']}")
-                            st.markdown(f"*{texts['resource_description']}*")
-                            st.json(results["performance"]["Resources"])
+                            st.markdown(f"### {texts['open_ports']}")
+                            st.markdown(f"*{texts['open_ports_description']}*")
+                            for port in results["port_scan"]["open_ports"]:
+                                st.markdown(f"- Port {port['port']}: {port['service']}")
                         
                         with col2:
-                            st.markdown(f"### {texts['loading_times']}")
-                            st.markdown(f"*{texts['loading_description']}*")
-                            st.json(results["performance"]["Loading"])
-                            
-                            st.markdown(f"### {texts['caching']}")
-                            st.markdown(f"*{texts['caching_description']}*")
-                            st.json(results["performance"]["Caching"])
-            
-                # Port Scan Results
-                if "port_scan" in results:
-                    with st.expander(texts["port_scan"], expanded=True):
-                        st.markdown(f"*{texts['port_description']}*")
-                        if "error" in results["port_scan"]:
-                            st.error(results["port_scan"]["error"])
-                        else:
-                            col1, col2 = st.columns(2)
-                            
-                            with col1:
-                                st.markdown(f"### {texts['open_ports']}")
-                                st.markdown(f"*{texts['open_ports_description']}*")
-                                for port in results["port_scan"]["open_ports"]:
-                                    st.markdown(f"- Port {port['port']}: {port['service']}")
-                            
-                            with col2:
-                                st.markdown(f"### {texts['closed_ports']}")
-                                st.markdown(f"*{texts['closed_ports_description']}*")
-                                st.markdown(f"- Closed: {', '.join(map(str, results['port_scan']['closed_ports']))}")
-                                st.markdown(f"- Filtered: {', '.join(map(str, results['port_scan']['filtered_ports']))}")
+                            st.markdown(f"### {texts['closed_ports']}")
+                            st.markdown(f"*{texts['closed_ports_description']}*")
+                            st.markdown(f"- Closed: {', '.join(map(str, results['port_scan']['closed_ports']))}")
+                            st.markdown(f"- Filtered: {', '.join(map(str, results['port_scan']['filtered_ports']))}")
 
-# Show scan history with enhanced display
+# Show scan history
 if st.session_state.scan_history:
     st.subheader(texts["scan_history"])
     history_df = pd.DataFrame(st.session_state.scan_history)
     
     # Add color coding based on scan type
     def color_scan_type(val):
-        return 'background-color: #90EE90' if val == 'quick' else 'background-color: #FFB6C1'
+        return 'background-color: #90EE90'
     
     styled_df = history_df.style.applymap(color_scan_type, subset=['scan_type'])
     st.dataframe(styled_df)
@@ -1937,8 +1924,7 @@ if st.session_state.scan_history:
             history_df,
             x="timestamp",
             y="response_time",
-            color="scan_type",
-            title="Response Times by Scan Type"
+            title="Response Times"
         )
         st.plotly_chart(fig, use_container_width=True)
 else:

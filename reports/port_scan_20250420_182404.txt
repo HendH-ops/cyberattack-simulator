@@ -1,0 +1,18 @@
+Port Scan Report
+===============
+
+Target: endover.ee
+Scan Time: 2025-04-20 18:24:04
+IP Address: 217.146.68.145
+
+Open Ports:
+==========
+Port 21: FTP
+Port 80: HTTP
+Port 443: HTTPS
+Port 990: Unknown
+
+Scan Summary:
+============
+Total ports scanned: 4
+Open ports found: 4

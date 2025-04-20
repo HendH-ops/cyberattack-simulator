@@ -1,0 +1,16 @@
+CMS Vulnerability Test Report
+Generated: 2025-04-20 18:18:17
+Target URL: https://endover.ee
+
+CMS Detection Results:
+--------------------
+WordPress: Unknown
+Status: Safe
+Details:
+- Version could not be determined
+- Recommendation: Verify the exact version manually
+- Note: This version check is based on known vulnerabilities in specific versions
+
+
+Plugin Vulnerabilities:
+----------------------

