@@ -8,7 +8,7 @@ from utils.display_utils import init_language, COMMON_TRANSLATIONS
 
 # Page config
 st.set_page_config(
-    page_title="Cyber Attack Simulator",
+    page_title="Cyber Attack Tester",
     page_icon="🛡️",
     layout="wide"
 )
@@ -16,7 +16,7 @@ st.set_page_config(
 # Page-specific translations
 PAGE_TRANSLATIONS = {
     "en": {
-        "page_title": "Cyber Attack Simulator",
+        "page_title": "Cyber Attack Tester",
         "description": """
 This tool simulates various types of cyber attacks to test system security.
 Select an attack type to begin testing:
