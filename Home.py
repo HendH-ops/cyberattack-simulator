@@ -23,7 +23,9 @@ Select an attack type to begin testing:
 - Scan: Analyze target system for vulnerabilities
 - XSS: Test for Cross-Site Scripting vulnerabilities
 - SQL: Test for SQL Injection vulnerabilities
-- DDoS: Test system resilience against DDoS attacks
+- Brute Force: Test password strength and login security
+- CSRF: Test for Cross-Site Request Forgery vulnerabilities
+- File Upload: Test for insecure file upload vulnerabilities
 """,
         "attack_type": "Attack Type",
         "target_website": "Target Website",
@@ -48,7 +50,9 @@ Vali rünnaku tüüp testimise alustamiseks:
 - Skaneerimine: Analüüsi sihtsüsteemi haavatavusi
 - XSS: Testi veebilehtede skriptide süstimise haavatavusi
 - SQL: Testi SQL süstimise haavatavusi
-- DDoS: Testi süsteemi vastupidavust DDoS rünnakutele
+- Brute Force: Testi paroolide tugevust ja sisselogimise turvalisust
+- CSRF: Testi rist-päringu võltsimise haavatavusi
+- File Upload: Testi failide üleslaadimise turvalisust
 """,
         "attack_type": "Rünnaku Tüüp",
         "target_website": "Sihtleht",
@@ -130,10 +134,22 @@ def simulate_attack(target, attack_type):
             "Database Configuration Issues",
             "Exposed Database Credentials"
         ],
-        "ddos": [
-            "Resource Exhaustion",
-            "Connection Flood",
-            "Application Layer Vulnerabilities"
+        "brute_force": [
+            "Weak Password Policy",
+            "No Account Lockout",
+            "Exposed Login Endpoints",
+            "Default Credentials"
+        ],
+        "csrf": [
+            "Missing CSRF Tokens",
+            "Insecure Session Management",
+            "Same-Origin Policy Violations"
+        ],
+        "file_upload": [
+            "Unrestricted File Types",
+            "No File Size Limits",
+            "Insecure File Storage",
+            "Directory Traversal"
         ]
     }
     
@@ -170,7 +186,7 @@ with col1:
 with col2:
     attack_type = st.selectbox(
         texts['attack_type'],
-        ["scan", "xss", "sql", "ddos"],
+        ["scan", "xss", "sql", "brute_force", "csrf", "file_upload"],
         index=0
     )
 
